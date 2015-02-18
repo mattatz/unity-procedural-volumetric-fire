@@ -4,7 +4,6 @@
         _NoiseTex ("Noise Texture", 2D) = "white" {}
         _FireTex ("Fire Texture", 2D) = "white" {}
 
-        _Octives ("_Octives", int) = 4
         _Lacunarity ("_Lacunarity", float) = 2.0
         _Gain ("_Gain", float) = 0.5
         _Magnitude ("_Magnitude", float) = 1.3
@@ -16,15 +15,16 @@
         LOD 200
 
         CGINCLUDE
-
+        
         #include "UnityCG.cginc"
-
+        #pragma target 3.0
+        
         #define MODULUS 61.0
+        #define OCTIVES 4
 
         sampler2D _NoiseTex;
         sampler2D _FireTex;
 
-        int _Octives;
         float _Lacunarity;
         float _Gain;
         float _Magnitude;
@@ -49,7 +49,8 @@
             float sum = 0.0;
             float freq = 1.0;
             float amp = 1.0;
-            for(int i = 0; i < _Octives; i++) {
+            
+            for(int i = 0; i < OCTIVES; i++) {
                 sum += abs(mnoise(pos * freq)) * amp;
                 freq *= _Lacunarity;	
                 amp *= _Gain;
@@ -83,7 +84,7 @@
 
         struct v2f {
             float4 pos : POSITION;
-            float3 normal : NORMAL;
+            float3 normal : TEXCOORD0;
         };
 
         v2f vert (appdata_full v) {
@@ -107,15 +108,17 @@
             #pragma vertex vert
             #pragma fragment frag
 
-            half4 frag (v2f i) : COLOR {
+            float4 frag (v2f i) : COLOR {
                 // use vertex' normal for tex location.
                 float3 loc = i.normal;
 
                 // Range [0.0, 1.0] to [- 1.0, 1.0]
                 loc.xz = (loc.xz * 2) - 1.0;
 
-                float3 col = sample_fire(loc, float4(1, 3, 1, 0.5));
-                return float4(col * 0.25, 1);
+                float4 col = sample_fire(loc, float4(1, 3, 1, 0.5));
+                col *= 0.25;
+                return float4(col.x, col.y, col.z, 1);
+                
             }
 
             ENDCG

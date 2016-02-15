@@ -11,8 +11,8 @@ public class ProceduralVolumetricFire : MonoBehaviour {
 	[SerializeField] 
 		float sliceSpacing = 0.02f;
 
-	[SerializeField] Vector4 scale = new Vector4(1f, 3f, 1f, 0.5f);
-	[SerializeField] float
+	public Vector4 scale = new Vector4(1f, 3f, 1f, 0.5f);
+	public float
 		lacunarity = 2.0f,
 		gain = 0.5f,
 		magnitude = 1.3f,
@@ -26,6 +26,7 @@ public class ProceduralVolumetricFire : MonoBehaviour {
 	}
 
 	void Update () {
+		material.SetFloat("_Atten", attenuation);
 		material.SetFloat("_Lacunarity", lacunarity);
 		material.SetFloat("_Gain", gain);
 		material.SetFloat("_Magnitude", magnitude);
@@ -79,29 +80,6 @@ public class ProceduralVolumetricFire : MonoBehaviour {
 		return mesh;
 	}
 
-	void OnGUI () {
-		GUI.color = Color.white;
-
-		GUIStyle labelStyle = new GUIStyle();
-		labelStyle.fontSize = 13;
-		
-		GUILayout.BeginVertical("box");
-		
-		GUILayout.Label("Lacunarity");
-		lacunarity = GUILayout.HorizontalSlider(lacunarity, 0f, 3.0f);
-
-		GUILayout.Space(8);
-		
-		GUILayout.Label("Gain");
-		gain = GUILayout.HorizontalSlider(gain, 0f, 3.0f);
-
-		GUILayout.Space(8);
-		
-		GUILayout.Label("Magnitude");
-		magnitude = GUILayout.HorizontalSlider(magnitude, 0f, 3.0f);
-
-		GUILayout.EndVertical();
-	}
 
 }
 

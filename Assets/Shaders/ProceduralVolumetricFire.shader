@@ -1,12 +1,12 @@
-﻿Shader "Mattatz/ProceduralVolumetricFire" {
+﻿Shader "mattatz/ProceduralVolumetricFire" {
 
     Properties {
-        _NoiseTex ("Noise Texture", 2D) = "white" {}
         _FireTex ("Fire Texture", 2D) = "white" {}
-
+        _Scale ("Fire Scale", Vector) = (1, 3, 1, 0.5)
         _Lacunarity ("_Lacunarity", float) = 2.0
         _Gain ("_Gain", float) = 0.5
         _Magnitude ("_Magnitude", float) = 1.3
+        _Atten ("Attenuation", Range(0.05, 0.7)) = 0.25
     }
 
     SubShader {
@@ -17,70 +17,51 @@
         CGINCLUDE
         
         #include "UnityCG.cginc"
-        #pragma target 3.0
+		
+        #include "./SimplexNoise3D.cginc"
+        #define FIRE_NOISE snoise
         
-        #define MODULUS 61.0
-        #define OCTIVES 4
+        // #include "./ClassicNoise3D.cginc"
+        // #define FIRE_NOISE cnoise
+        
+		#define FIRE_OCTIVES 4
+        
+		sampler2D _FireTex;
+        fixed4 _Scale;
+		float _Lacunarity;
+		float _Gain;
+		float _Magnitude;
+		fixed _Atten;
 
-        sampler2D _NoiseTex;
-        sampler2D _FireTex;
+		float turbulence(float3 pos) {
+		    float sum = 0.0;
+		    float freq = 1.0;
+		    float amp = 1.0;
+		    
+		    for(int i = 0; i < FIRE_OCTIVES; i++) {
+		        sum += abs(FIRE_NOISE(pos * freq)) * amp;
+		        freq *= _Lacunarity;	
+		        amp *= _Gain;
+		    }
+		    return sum;
+		}
 
-        float _Lacunarity;
-        float _Gain;
-        float _Magnitude;
+		float4 sample_fire (float3 loc, float4 scale) {
+		    // convert to (radius, height) to sample fire texture.
+		    float2 st = float2(sqrt(dot(loc.xz, loc.xz)), loc.y);
 
-        float2 mBBS(float2 val, float mdls) {
-            val = fmod(val, mdls);
-            return fmod(val * val, mdls);
-        }
+		    // convert loc to noise space
+		    loc.y -= _Time.y * scale.w;
+		    loc *= scale.xyz;
 
-        float mnoise(float3 pos) {
-            float intArg = floor(pos.z);
-            float fracArg = frac(pos.z);
-            float2 hash = mBBS(intArg * 3.0 + float2(0, 3), MODULUS);
-            float4 g = float4(
-                tex2D(_NoiseTex, float2(pos.x, pos.y + hash.x) / MODULUS).xy, 
-                tex2D(_NoiseTex, float2(pos.x, pos.y + hash.y) / MODULUS).xy * 2.0 - 1.0
-            );
-            return lerp(g.x + g.y * fracArg, g.z + g.w * (fracArg - 1.0), smoothstep(0.0, 1.0, fracArg));
-        }
+		    st.y += sqrt(st.y) * _Magnitude * turbulence(loc);
 
-        float turbulence(float3 pos) {
-            float sum = 0.0;
-            float freq = 1.0;
-            float amp = 1.0;
-            
-            for(int i = 0; i < OCTIVES; i++) {
-                sum += abs(mnoise(pos * freq)) * amp;
-                freq *= _Lacunarity;	
-                amp *= _Gain;
-            }
-            return sum;
-        }
+		    if(st.y > 1.0) {
+		        return float4(0, 0, 0, 1);
+		    }
 
-        float4 sample_fire(float3 loc, float4 scale) {
-
-            // convert to (radius, height) to sample fire texture.
-            float2 st = float2(sqrt(dot(loc.xz, loc.xz)), loc.y);
-
-            // convert loc to 'noise' space
-            loc.y -= _Time.y * scale.w;
-            loc *= scale.xyz;
-
-            st.y += sqrt(st.y) * _Magnitude * turbulence(loc);
-
-            if(st.y > 1.0) {
-                return float4(0, 0, 0, 1);
-            }
-
-            float4 result = tex2D(_FireTex, st);
-
-            if(st.y < 0.1) {
-                result *= st.y / 0.1;
-            }
-
-            return result;
-        }
+		    return tex2D(_FireTex, st);
+		}
 
         struct v2f {
             float4 pos : POSITION;
@@ -91,38 +72,32 @@
             v2f o;
             o.pos = mul(UNITY_MATRIX_MVP, v.vertex);
             o.normal = v.normal;
-
             return o;
+        }
+        
+        float4 frag (v2f i) : COLOR {
+            // use vertex' normal for tex location.
+            float3 loc = i.normal;
+
+            // Range [0.0, 1.0] to [- 1.0, 1.0]
+            loc.xz = (loc.xz * 2) - 1.0;
+
+            float4 col = sample_fire(loc, _Scale);
+            return float4(col.rgb * _Atten, 1.0);
         }
 
         ENDCG
 
         Pass {
-
             Cull Off
             Blend One One
             ZTest Always
 
             CGPROGRAM
-
+        	#pragma target 3.0
             #pragma vertex vert
             #pragma fragment frag
-
-            float4 frag (v2f i) : COLOR {
-                // use vertex' normal for tex location.
-                float3 loc = i.normal;
-
-                // Range [0.0, 1.0] to [- 1.0, 1.0]
-                loc.xz = (loc.xz * 2) - 1.0;
-
-                float4 col = sample_fire(loc, float4(1, 3, 1, 0.5));
-                col *= 0.25;
-                return float4(col.x, col.y, col.z, 1);
-                
-            }
-
             ENDCG
-
         }
 
     } 

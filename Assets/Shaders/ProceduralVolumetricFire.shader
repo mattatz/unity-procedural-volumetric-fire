@@ -2,29 +2,49 @@
 
     Properties {
         _FireTex ("Fire Texture", 2D) = "white" {}
-        _Scale ("Fire Scale", Vector) = (1, 3, 1, 0.5)
-        _Lacunarity ("_Lacunarity", float) = 2.0
-        _Gain ("_Gain", float) = 0.5
-        _Magnitude ("_Magnitude", float) = 1.3
-        _Atten ("Attenuation", Range(0.05, 0.7)) = 0.25
-    }
+		_NoiseTex ("Noise Texture", 3D) = "" {}
+		_Scale ("Fire Scale", Vector) = (1, 3, 1, 0.5)
+		_Lacunarity ("_Lacunarity", float) = 2.0
+		_Gain ("_Gain", float) = 0.5
+		_Magnitude ("_Magnitude", float) = 1.3
+		_Atten ("Attenuation", Range(0.05, 0.7)) = 0.25
 
-    SubShader {
-        Tags { "RenderType"="Opaque" }
+		_WavePower ("Wave Power", float) = 0.8
+		_WaveSpeed ("Wave Speed", float) = 0.25
+		_WaveIntensity ("Wave Intensity", float) = 1.0
+		_WaveScale ("Wave Scale", Vector) = (0.25, 1, 0.5)
+	}
 
-        LOD 200
+	SubShader {
+		Tags { "RenderType" = "Opaque" }
 
-        CGINCLUDE
+		LOD 200
 
-        #include "UnityCG.cginc"
+		CGINCLUDE
 
-        #include "./SimplexNoise3D.cginc"
-        #define FIRE_NOISE snoise
+		#include "UnityCG.cginc"
+
+		#include "./SimplexNoise3D.cginc"
+
+		sampler3D _NoiseTex;
+		float sample_noise(float3 seed) {
+			float n = (tex3D(_NoiseTex, seed).r - 0.5) * 2.0;
+			return n;
+		}
+
+		// USE PROCEDURAL NOISE
+		// #define FIRE_NOISE snoise
+
+		// USE SAMPLING NOISE
+		#define FIRE_NOISE sample_noise
 
         // #include "./ClassicNoise3D.cginc"
         // #define FIRE_NOISE cnoise
 
         #define FIRE_OCTIVES 4
+
+		fixed _WavePower, _WaveSpeed, _WaveIntensity;
+		fixed3 _WaveScale;
 
         sampler2D _FireTex;
         fixed4 _Scale;
@@ -70,6 +90,11 @@
 
         v2f vert (appdata_full v) {
             v2f o;
+
+			float y = v.vertex.y; // 0.0 ~ 1.0
+			float h = pow(y, _WavePower);
+			float n = snoise(v.vertex.xyz * _WaveScale + float3(0, 0, _Time.y * _WaveSpeed));
+			v.vertex.x += n * 0.5 * h * _WaveIntensity;
             o.pos = mul(UNITY_MATRIX_MVP, v.vertex);
             o.normal = v.normal;
             return o;
